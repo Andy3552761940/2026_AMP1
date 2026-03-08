@@ -15,6 +15,7 @@ from sklearn.preprocessing import StandardScaler
 from .embedding import ESMEmbedder
 from .features import build_handcrafted_matrix
 from .metrics_utils import compute_binary_metrics, find_best_threshold
+from .deep_model import ESMDeepClassifier
 
 
 def train_with_cv(
@@ -42,6 +43,7 @@ def train_with_cv(
 
     oof_lgb = np.zeros(len(df), dtype=float)
     oof_esm = np.zeros(len(df), dtype=float)
+    oof_dnn = np.zeros(len(df), dtype=float)
     oof_counts = np.zeros(len(df), dtype=float)
 
     for tr, va in rskf.split(X_h, y):
@@ -63,13 +65,18 @@ def train_with_cv(
         ])
         esm_lr.fit(X_e[tr], y[tr])
         oof_esm[va] += esm_lr.predict_proba(X_e[va])[:, 1]
+
+        esm_dnn = ESMDeepClassifier(device=device, random_state=seed)
+        esm_dnn.fit(X_e[tr], y[tr])
+        oof_dnn[va] += esm_dnn.predict_proba(X_e[va])[:, 1]
         oof_counts[va] += 1.0
 
     oof_counts[oof_counts == 0] = 1.0
     oof_lgb = oof_lgb / oof_counts
     oof_esm = oof_esm / oof_counts
+    oof_dnn = oof_dnn / oof_counts
 
-    X_meta = np.vstack([oof_lgb, oof_esm]).T
+    X_meta = np.vstack([oof_lgb, oof_esm, oof_dnn]).T
     meta_base = LogisticRegression(max_iter=2000, class_weight="balanced", C=0.8)
     calibrator = CalibratedClassifierCV(estimator=meta_base, method="sigmoid", cv=5)
     calibrator.fit(X_meta, y)
@@ -80,6 +87,7 @@ def train_with_cv(
     cv_metrics = {
         "handcrafted_lgbm": compute_binary_metrics(y, oof_lgb, thr=0.5),
         "esm_lr": compute_binary_metrics(y, oof_esm, thr=0.5),
+        "esm_dnn": compute_binary_metrics(y, oof_dnn, thr=0.5),
         "stacking": compute_binary_metrics(y, oof_stack, thr=best_thr),
         "best_threshold": {"metric": threshold_metric, "threshold": best_thr, "score": best_thr_score},
     }
@@ -103,19 +111,32 @@ def train_with_cv(
     ])
     final_esm_lr.fit(X_e, y)
 
+    final_esm_dnn = ESMDeepClassifier(device=device, random_state=seed)
+    final_esm_dnn.fit(X_e, y)
+
     joblib.dump(final_lgb, out / "branch_handcrafted_lgbm.joblib")
     joblib.dump(final_esm_lr, out / "branch_esm_lr.joblib")
+    joblib.dump(final_esm_dnn, out / "branch_esm_dnn.joblib")
     final_meta = CalibratedClassifierCV(
         estimator=LogisticRegression(max_iter=2000, class_weight="balanced", C=0.8),
         method="sigmoid",
         cv=5,
     )
-    final_meta.fit(np.vstack([final_lgb.predict_proba(X_h)[:, 1], final_esm_lr.predict_proba(X_e)[:, 1]]).T, y)
+    final_meta.fit(
+        np.vstack([
+            final_lgb.predict_proba(X_h)[:, 1],
+            final_esm_lr.predict_proba(X_e)[:, 1],
+            final_esm_dnn.predict_proba(X_e)[:, 1],
+        ]).T,
+        y,
+    )
 
     joblib.dump(final_meta, out / "stacking_model.joblib")
     with open(out / "cv_metrics.json", "w", encoding="utf-8") as f:
         json.dump(cv_metrics, f, indent=2, ensure_ascii=False)
     with open(out / "decision_config.json", "w", encoding="utf-8") as f:
         json.dump({"recommended_threshold": best_thr}, f, indent=2, ensure_ascii=False)
+    with open(out / "stack_config.json", "w", encoding="utf-8") as f:
+        json.dump({"meta_feature_order": ["handcrafted_lgbm", "esm_lr", "esm_dnn"]}, f, indent=2, ensure_ascii=False)
 
     return cv_metrics

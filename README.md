@@ -18,10 +18,11 @@
 2. **Protein LM 表征分支**
    - 预训练模型：`facebook/esm2_t6_8M_UR50D`
    - 序列 mean pooling 嵌入
-   - 模型：Logistic Regression
+   - 模型A：Logistic Regression
+   - 模型B：Residual MLP（PyTorch，支持 GPU、BatchNorm + Dropout + CosineAnnealing + EarlyStopping）
 3. **Stacking 融合**
-   - 用两路分支输出概率作为二级模型输入
-   - 元学习器：Logistic Regression
+   - 用三路分支输出概率作为二级模型输入
+   - 元学习器：Logistic Regression + 概率校准
 
 > 该方案在公开文献中常见范式基础上做了轻量改进（双分支 + stacking + class_weight + repeated CV），通常可稳定优于单一特征模型。
 
@@ -51,7 +52,7 @@ bash scripts/one_click_run.sh \
   --train_csv data/processed/train.csv \
   --test_csv data/processed/test.csv \
   --out_dir outputs/one_click \
-  --device cpu
+  --device cuda
 ```
 
 常用可选参数：
@@ -64,7 +65,7 @@ bash scripts/one_click_run.sh \
 python scripts/train.py \
   --train_csv data/processed/train.csv \
   --out_dir outputs/exp1 \
-  --folds 5 --repeats 2 --seed 42 --threshold_metric mcc
+  --folds 5 --repeats 2 --seed 42 --threshold_metric mcc --device cuda
 ```
 
 

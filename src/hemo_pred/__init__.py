@@ -4,4 +4,5 @@ __all__ = [
     "embedding",
     "train_pipeline",
     "infer",
+    "deep_model",
 ]
