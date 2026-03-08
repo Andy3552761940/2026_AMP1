@@ -64,8 +64,15 @@ bash scripts/one_click_run.sh \
 python scripts/train.py \
   --train_csv data/processed/train.csv \
   --out_dir outputs/exp1 \
-  --folds 5 --seed 42
+  --folds 5 --repeats 2 --seed 42 --threshold_metric mcc
 ```
+
+
+新增训练参数（提升泛化稳定性）：
+- `--repeats`：重复分层 K 折次数（默认 2）
+- `--threshold_metric`：自动阈值选择目标（`mcc`/`f1`/`accuracy`）
+
+评估时若不传 `--thr`，会自动读取 `decision_config.json` 中的推荐阈值。
 
 ### 5) 独立测试评估
 ```bash
