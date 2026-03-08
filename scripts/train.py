@@ -19,6 +19,8 @@ def main() -> None:
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--repeats", type=int, default=2)
+    ap.add_argument("--threshold_metric", default="mcc", choices=["mcc", "f1", "accuracy"])
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
 
@@ -29,8 +31,10 @@ def main() -> None:
         label_col=args.label_col,
         out_dir=args.out_dir,
         folds=args.folds,
+        repeats=args.repeats,
         seed=args.seed,
         device=args.device,
+        threshold_metric=args.threshold_metric,
     )
     print(metrics)
 
