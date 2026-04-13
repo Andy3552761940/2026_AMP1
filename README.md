@@ -102,6 +102,42 @@ python scripts/predict.py \
 ## 备注
 - 若你希望冲击更高上限（>92%），建议把 ESM backbone 替换为 `esm2_t12_35M_UR50D` 或 `prot_t5_xl_uniref50` 并增加温度缩放校准。
 
+
+## 桌面 GUI（支持打包 EXE）
+除了 JSP 示例，你还可以直接使用 Python 桌面 GUI：
+
+### 1) 启动 GUI
+```bash
+python scripts/gui_app.py
+```
+
+GUI 功能包括：
+- 模型目录/输入 CSV/输出 CSV 可视化选择
+- 自动读取 CSV 列名并选择序列列
+- 阈值滑条（0.1~0.9）动态调节
+- `cpu/cuda` 推理设备选择
+- 结果表格预览（概率 + 标签）
+- 预测统计（总样本、阳性数、阴性数）
+- 一键导出结果
+
+### 2) 打包为 Windows EXE（PyInstaller）
+先安装打包依赖：
+```bash
+pip install pyinstaller
+```
+
+然后执行：
+```bash
+python scripts/build_exe.py --name HemolysisPredictorPro --onefile 1
+```
+
+或者在 Windows 下：
+```bat
+scripts\build_exe.bat --name HemolysisPredictorPro --onefile 1
+```
+
+产物默认在 `dist/` 目录。
+
 ## JSP GUI（服务器部署）
 仓库新增 `gui/` 目录，包含一个可直接部署的 JSP 页面示例：
 - `gui/index.jsp`：主页面 + 表单提交 + 简单风险演示逻辑
