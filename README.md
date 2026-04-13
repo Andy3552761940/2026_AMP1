@@ -101,3 +101,16 @@ python scripts/predict.py \
 
 ## 备注
 - 若你希望冲击更高上限（>92%），建议把 ESM backbone 替换为 `esm2_t12_35M_UR50D` 或 `prot_t5_xl_uniref50` 并增加温度缩放校准。
+
+## JSP GUI（服务器部署）
+仓库新增 `gui/` 目录，包含一个可直接部署的 JSP 页面示例：
+- `gui/index.jsp`：主页面 + 表单提交 + 简单风险演示逻辑
+- `gui/assets/style.css`：页面样式
+- `gui/WEB-INF/web.xml`：Web 应用配置（欢迎页为 `index.jsp`）
+
+### Tomcat 部署示例
+1. 将 `gui/` 目录拷贝为 Tomcat 的一个 webapp（例如 `webapps/hemo-gui/`）。
+2. 启动 Tomcat。
+3. 访问 `http://<server-ip>:8080/hemo-gui/`。
+
+> 当前 GUI 仅作为 JSP 前端演示，评估逻辑为样例公式，不作为医疗建议。
