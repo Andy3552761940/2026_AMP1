@@ -103,24 +103,45 @@ python scripts/predict.py \
 - 若你希望冲击更高上限（>92%），建议把 ESM backbone 替换为 `esm2_t12_35M_UR50D` 或 `prot_t5_xl_uniref50` 并增加温度缩放校准。
 
 
-## 桌面 GUI（支持打包 EXE）
-除了 JSP 示例，你还可以直接使用 Python 桌面 GUI：
+## 云端推理 API + 本地桌面 GUI
+当前推荐架构：本地 GUI 只负责文件选择/上传/下载预览，模型推理在云端 API 完成。
 
-### 1) 启动 GUI
+### 1) 启动云端 API（FastAPI）
+先准备模型目录（例如 `outputs/exp1`），然后启动服务：
+
+```bash
+export HEMO_MODEL_DIR=outputs/exp1
+python scripts/predict_api.py
+```
+
+或使用 uvicorn：
+
+```bash
+HEMO_MODEL_DIR=outputs/exp1 uvicorn scripts.predict_api:app --host 0.0.0.0 --port 8000
+```
+
+接口说明：
+- `GET /health`：健康检查
+- `POST /predict`：上传 CSV 推理并返回结果 CSV
+  - form 字段：`file`、`seq_col`、`thr`、`device`、`model_dir(可选)`
+  - 若不传 `model_dir`，将使用环境变量 `HEMO_MODEL_DIR`
+
+### 2) 启动本地 GUI（云端调用模式）
 ```bash
 python scripts/gui_app.py
 ```
 
 GUI 功能包括：
-- 模型目录/输入 CSV/输出 CSV 可视化选择
+- 配置云端 API 地址
+- 本地输入 CSV/输出 CSV 可视化选择
 - 自动读取 CSV 列名并选择序列列
 - 阈值滑条（0.1~0.9）动态调节
-- `cpu/cuda` 推理设备选择
-- 结果表格预览（概率 + 标签）
+- 远端 `cpu/cuda` 设备选择
+- 上传文件后自动下载结果并本地预览
 - 预测统计（总样本、阳性数、阴性数）
 - 一键导出结果
 
-### 2) 打包为 Windows EXE（PyInstaller）
+### 3) 打包为 Windows EXE（PyInstaller）
 先安装打包依赖：
 ```bash
 pip install pyinstaller

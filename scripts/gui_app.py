@@ -2,17 +2,13 @@
 from __future__ import annotations
 
 import os
-import sys
 import threading
 from pathlib import Path
 
 import pandas as pd
+import requests
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-
-sys.path.append(os.path.abspath("src"))
-
-from hemo_pred.infer import predict_proba
 
 
 class HemoPredictorGUI:
@@ -22,13 +18,14 @@ class HemoPredictorGUI:
         self.root.geometry("1200x760")
         self.root.minsize(980, 620)
 
+        self.api_url = tk.StringVar(value="http://127.0.0.1:8000/predict")
         self.model_dir = tk.StringVar()
         self.input_csv = tk.StringVar()
         self.output_csv = tk.StringVar()
         self.seq_col = tk.StringVar(value="sequence")
         self.device = tk.StringVar(value="cpu")
         self.threshold = tk.DoubleVar(value=0.5)
-        self.status_var = tk.StringVar(value="请选择模型和CSV后开始预测")
+        self.status_var = tk.StringVar(value="请选择CSV并配置云端API后开始预测")
 
         self.df: pd.DataFrame | None = None
         self.pred_df: pd.DataFrame | None = None
@@ -61,26 +58,27 @@ class HemoPredictorGUI:
         ttk.Label(header, text="Hemolysis Predictor Pro", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             header,
-            text="上传氨基酸序列CSV → 配置阈值与设备 → 一键预测并导出结果",
+            text="本地选CSV并上传到云端推理 → 下载结果CSV → 本地预览与导出",
             style="Hint.TLabel",
         ).pack(anchor="w", pady=(3, 12))
 
         config = ttk.Frame(outer, style="Card.TFrame", padding=12)
         config.pack(fill="x", pady=(0, 8))
 
-        self._file_row(config, "模型目录", self.model_dir, self.pick_model_dir, 0)
-        self._file_row(config, "输入CSV", self.input_csv, self.pick_input_csv, 1)
-        self._file_row(config, "输出CSV", self.output_csv, self.pick_output_csv, 2)
+        self._entry_row(config, "云端API", self.api_url, 0)
+        self._file_row(config, "服务器模型目录(可选)", self.model_dir, self.pick_model_dir, 1)
+        self._file_row(config, "输入CSV", self.input_csv, self.pick_input_csv, 2)
+        self._file_row(config, "输出CSV", self.output_csv, self.pick_output_csv, 3)
 
         options = ttk.Frame(config, style="Card.TFrame")
-        options.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(12, 4))
+        options.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(12, 4))
         options.columnconfigure(6, weight=1)
 
         ttk.Label(options, text="序列列名", style="Body.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
         self.seq_combo = ttk.Combobox(options, textvariable=self.seq_col, values=["sequence"], state="readonly", width=20)
         self.seq_combo.grid(row=0, column=1, sticky="w", padx=(0, 18))
 
-        ttk.Label(options, text="计算设备", style="Body.TLabel").grid(row=0, column=2, sticky="w", padx=(0, 8))
+        ttk.Label(options, text="云端设备", style="Body.TLabel").grid(row=0, column=2, sticky="w", padx=(0, 8))
         ttk.Combobox(options, textvariable=self.device, values=["cpu", "cuda"], state="readonly", width=8).grid(
             row=0, column=3, sticky="w", padx=(0, 18)
         )
@@ -129,6 +127,11 @@ class HemoPredictorGUI:
         self.tree.configure(yscrollcommand=yscroll.set)
         yscroll.pack(side="right", fill="y")
 
+    def _entry_row(self, parent: ttk.Frame, title: str, var: tk.StringVar, row: int) -> None:
+        ttk.Label(parent, text=title, style="Body.TLabel").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(parent, textvariable=var, width=100).grid(row=row, column=1, columnspan=2, sticky="ew", padx=(0, 8), pady=4)
+        parent.columnconfigure(1, weight=1)
+
     def _file_row(self, parent: ttk.Frame, title: str, var: tk.StringVar, command, row: int) -> None:
         ttk.Label(parent, text=title, style="Body.TLabel").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Entry(parent, textvariable=var, width=100).grid(row=row, column=1, sticky="ew", padx=(0, 8), pady=4)
@@ -139,7 +142,7 @@ class HemoPredictorGUI:
         self.threshold_label.configure(text=f"{self.threshold.get():.2f}")
 
     def pick_model_dir(self) -> None:
-        p = filedialog.askdirectory(title="选择模型目录（含stacking_model.joblib）")
+        p = filedialog.askdirectory(title="服务器上的模型目录（可选）")
         if p:
             self.model_dir.set(p)
 
@@ -169,28 +172,42 @@ class HemoPredictorGUI:
         self.status_var.set(f"已加载列名: {', '.join(cols)}")
 
     def start_predict(self) -> None:
-        if not self.model_dir.get() or not self.input_csv.get() or not self.output_csv.get():
-            messagebox.showerror("缺少参数", "请完整选择模型目录、输入CSV和输出CSV")
+        if not self.api_url.get().strip() or not self.input_csv.get() or not self.output_csv.get():
+            messagebox.showerror("缺少参数", "请完整配置云端API、输入CSV和输出CSV")
             return
         self.progress.start(10)
-        self.status_var.set("模型推理中，请稍候...")
+        self.status_var.set("上传CSV到云端并等待推理...")
         threading.Thread(target=self._run_prediction, daemon=True).start()
 
     def _run_prediction(self) -> None:
         try:
-            df = pd.read_csv(self.input_csv.get())
             seq_col = self.seq_col.get().strip()
-            if seq_col not in df.columns:
-                raise ValueError(f"CSV中找不到序列列: {seq_col}")
+            with open(self.input_csv.get(), "rb") as infile:
+                files = {
+                    "file": (Path(self.input_csv.get()).name, infile, "text/csv"),
+                }
+                data = {
+                    "seq_col": seq_col,
+                    "thr": f"{self.threshold.get():.6f}",
+                    "device": self.device.get(),
+                }
+                if self.model_dir.get().strip():
+                    data["model_dir"] = self.model_dir.get().strip()
 
-            probs = predict_proba(df, self.model_dir.get(), seq_col=seq_col, device=self.device.get())
-            out = df.copy()
-            out["p_hemolysis"] = probs
-            out["pred_label"] = (probs >= self.threshold.get()).astype(int)
-            out.to_csv(self.output_csv.get(), index=False)
+                resp = requests.post(self.api_url.get().strip(), files=files, data=data, timeout=3600)
 
-            self.df = df
-            self.pred_df = out
+            if resp.status_code >= 400:
+                raise RuntimeError(f"云端推理失败({resp.status_code}): {resp.text}")
+
+            with open(self.output_csv.get(), "wb") as out:
+                out.write(resp.content)
+
+            out_df = pd.read_csv(self.output_csv.get())
+            if seq_col not in out_df.columns:
+                raise ValueError(f"结果CSV中找不到序列列: {seq_col}")
+
+            self.pred_df = out_df
+            self.df = out_df
             self.root.after(0, self._on_predict_done)
         except Exception as e:
             self.root.after(0, lambda: self._on_predict_error(str(e)))
@@ -200,25 +217,29 @@ class HemoPredictorGUI:
         assert self.pred_df is not None
         self.refresh_table(self.pred_df)
         total = len(self.pred_df)
-        pos = int((self.pred_df["pred_label"] == 1).sum())
+        pos = int((self.pred_df["pred_label"] == 1).sum()) if "pred_label" in self.pred_df.columns else 0
         neg = total - pos
 
         self.metric_total.configure(text=f"样本数: {total}")
         self.metric_pos.configure(text=f"预测溶血(1): {pos}")
         self.metric_neg.configure(text=f"预测非溶血(0): {neg}")
         self.status_var.set(f"预测完成，结果已保存到: {self.output_csv.get()}")
-        messagebox.showinfo("完成", "预测完成并已导出CSV。")
+        messagebox.showinfo("完成", "云端预测完成，结果已下载并导出CSV。")
 
     def _on_predict_error(self, msg: str) -> None:
         self.progress.stop()
-        self.status_var.set("预测失败，请检查参数配置")
+        self.status_var.set("预测失败，请检查API和参数配置")
         messagebox.showerror("预测失败", msg)
 
     def refresh_table(self, df: pd.DataFrame) -> None:
         self.tree.delete(*self.tree.get_children())
+        seq_col = self.seq_col.get()
         for idx, row in df.head(500).iterrows():
-            seq_val = str(row.get(self.seq_col.get(), ""))
-            self.tree.insert("", "end", values=(idx, seq_val[:120], f"{row['p_hemolysis']:.4f}", int(row["pred_label"])))
+            seq_val = str(row.get(seq_col, ""))
+            p_val = row.get("p_hemolysis", float("nan"))
+            label_val = row.get("pred_label", "")
+            p_text = f"{float(p_val):.4f}" if pd.notna(p_val) else ""
+            self.tree.insert("", "end", values=(idx, seq_val[:120], p_text, label_val))
 
     def export_current(self) -> None:
         if self.pred_df is None:
