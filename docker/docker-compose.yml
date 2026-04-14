@@ -1,0 +1,41 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MODEL_DIR: /models/exp1
+      UPLOAD_DIR: /runtime/uploads
+      RESULT_DIR: /runtime/results
+    volumes:
+      - ../outputs/exp1:/models/exp1:ro
+      - runtime_data:/runtime
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MODEL_DIR: /models/exp1
+      UPLOAD_DIR: /runtime/uploads
+      RESULT_DIR: /runtime/results
+    volumes:
+      - ../outputs/exp1:/models/exp1:ro
+      - runtime_data:/runtime
+    depends_on:
+      - redis
+
+volumes:
+  runtime_data:
