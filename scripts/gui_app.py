@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+<<<<<<< ours
 import os
+=======
+>>>>>>> theirs
 import threading
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
@@ -25,7 +29,11 @@ class HemoPredictorGUI:
         self.seq_col = tk.StringVar(value="sequence")
         self.device = tk.StringVar(value="cpu")
         self.threshold = tk.DoubleVar(value=0.5)
+<<<<<<< ours
         self.status_var = tk.StringVar(value="请选择CSV并配置云端API后开始预测")
+=======
+        self.status_var = tk.StringVar(value="请先点“测试API连接”，通过后再开始预测")
+>>>>>>> theirs
 
         self.df: pd.DataFrame | None = None
         self.pred_df: pd.DataFrame | None = None
@@ -66,12 +74,24 @@ class HemoPredictorGUI:
         config.pack(fill="x", pady=(0, 8))
 
         self._entry_row(config, "云端API", self.api_url, 0)
+<<<<<<< ours
         self._file_row(config, "服务器模型目录(可选)", self.model_dir, self.pick_model_dir, 1)
         self._file_row(config, "输入CSV", self.input_csv, self.pick_input_csv, 2)
         self._file_row(config, "输出CSV", self.output_csv, self.pick_output_csv, 3)
 
         options = ttk.Frame(config, style="Card.TFrame")
         options.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(12, 4))
+=======
+        ttk.Label(config, text="示例: http://<服务器IP>:8000/predict", style="Hint.TLabel").grid(
+            row=1, column=1, columnspan=2, sticky="w", padx=(0, 8)
+        )
+        self._entry_row(config, "服务器模型目录(可选)", self.model_dir, 2)
+        self._file_row(config, "输入CSV", self.input_csv, self.pick_input_csv, 3)
+        self._file_row(config, "输出CSV", self.output_csv, self.pick_output_csv, 4)
+
+        options = ttk.Frame(config, style="Card.TFrame")
+        options.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(12, 4))
+>>>>>>> theirs
         options.columnconfigure(6, weight=1)
 
         ttk.Label(options, text="序列列名", style="Body.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
@@ -94,6 +114,7 @@ class HemoPredictorGUI:
         actions = ttk.Frame(outer, style="Card.TFrame")
         actions.pack(fill="x", pady=(0, 10))
         ttk.Button(actions, text="加载CSV列信息", command=self.load_csv_columns).pack(side="left", padx=(0, 8))
+        ttk.Button(actions, text="测试API连接", command=self.test_api_connection).pack(side="left", padx=(0, 8))
         ttk.Button(actions, text="开始预测", style="Accent.TButton", command=self.start_predict).pack(side="left", padx=(0, 8))
         ttk.Button(actions, text="导出当前结果", command=self.export_current).pack(side="left")
 
@@ -141,10 +162,31 @@ class HemoPredictorGUI:
     def _on_threshold_change(self, *_args) -> None:
         self.threshold_label.configure(text=f"{self.threshold.get():.2f}")
 
+<<<<<<< ours
     def pick_model_dir(self) -> None:
         p = filedialog.askdirectory(title="服务器上的模型目录（可选）")
         if p:
             self.model_dir.set(p)
+=======
+    def _health_url(self) -> str:
+        api_url = self.api_url.get().strip()
+        parsed = urlparse(api_url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("API地址格式错误，请使用 http://host:port/predict")
+        return f"{parsed.scheme}://{parsed.netloc}/health"
+
+    def test_api_connection(self) -> None:
+        try:
+            health_url = self._health_url()
+            resp = requests.get(health_url, timeout=10)
+            if resp.status_code != 200:
+                raise RuntimeError(f"HTTP {resp.status_code}: {resp.text}")
+            self.status_var.set(f"API连接正常: {health_url}")
+            messagebox.showinfo("连接成功", f"已连通 {health_url}")
+        except Exception as exc:
+            self.status_var.set("API连接失败，请检查地址/端口/防火墙")
+            messagebox.showerror("连接失败", str(exc))
+>>>>>>> theirs
 
     def pick_input_csv(self) -> None:
         p = filedialog.askopenfilename(title="选择待预测CSV", filetypes=[("CSV", "*.csv")])

@@ -126,6 +126,23 @@ HEMO_MODEL_DIR=outputs/exp1 uvicorn scripts.predict_api:app --host 0.0.0.0 --por
   - form 字段：`file`、`seq_col`、`thr`、`device`、`model_dir(可选)`
   - 若不传 `model_dir`，将使用环境变量 `HEMO_MODEL_DIR`
 
+<<<<<<< ours
+=======
+#### 云端 API 配置（实用版）
+1. 服务器启动（GPU 机器）
+```bash
+cd /path/to/Hemolysis-Pred
+pip install -r requirements.txt
+export HEMO_MODEL_DIR=/path/to/Hemolysis-Pred/outputs/exp1
+uvicorn scripts.predict_api:app --host 0.0.0.0 --port 8000
+```
+2. 开放端口：确保服务器防火墙/安全组放通 `8000`。
+3. 客户端 GUI 填写：
+   - `云端API`：`http://<服务器公网IP或内网IP>:8000/predict`
+   - `服务器模型目录(可选)`：通常留空（留空时用服务器上的 `HEMO_MODEL_DIR`）。
+4. 先点 GUI 里的“测试API连接”，连通后再点“开始预测”。
+
+>>>>>>> theirs
 ### 2) 启动本地 GUI（云端调用模式）
 ```bash
 python scripts/gui_app.py
