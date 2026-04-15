@@ -166,7 +166,10 @@ class HemoPredictorGUI:
         p = filedialog.askdirectory(title="服务器上的模型目录（可选）")
         if p:
             self.model_dir.set(p)
+<<<<<<< HEAD
 
+=======
+>>>>>>> c59664dc7ae3f32f4b24f5a0e877edfc7b819ff6
     def _health_url(self) -> str:
         api_url = self.api_url.get().strip()
         parsed = urlparse(api_url)
@@ -185,7 +188,10 @@ class HemoPredictorGUI:
         except Exception as exc:
             self.status_var.set("API连接失败，请检查地址/端口/防火墙")
             messagebox.showerror("连接失败", str(exc))
+<<<<<<< HEAD
 
+=======
+>>>>>>> c59664dc7ae3f32f4b24f5a0e877edfc7b819ff6
 
     def pick_input_csv(self) -> None:
         p = filedialog.askopenfilename(title="选择待预测CSV", filetypes=[("CSV", "*.csv")])
